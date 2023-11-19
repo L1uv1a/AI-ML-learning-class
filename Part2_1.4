@@ -1,0 +1,72 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import accuracy_score
+
+def evaluatePerformance():
+    # Load Data
+    filename = 'https://raw.githubusercontent.com/adziorny/CIS419/master/Assignment1/hw1_skeleton/data/SPECTF.dat'
+    data = np.loadtxt(filename, delimiter=',')
+    X = data[:, 1:]
+    y = data[:, 0]
+    n, d = X.shape
+
+    np.random.seed(13)  # Seed for reproducibility
+
+    num_trials = 100
+    num_folds = 10
+    accuracies = np.zeros((num_trials * num_folds, 5))  # To store accuracy values for each fold and model
+
+    idx = np.arange(n)
+
+    # Varying depths for decision trees
+    depths = [1, 2, 3, 5, None]
+
+    for i in range(num_trials):
+        np.random.shuffle(idx)  # Shuffle data indices for each trial
+
+        for j in range(num_folds):
+            test_indices = idx[j * (n // num_folds): (j + 1) * (n // num_folds)]
+            train_indices = np.concatenate([idx[:j * (n // num_folds)], idx[(j + 1) * (n // num_folds):]])
+
+            Xtrain, Xtest = X[train_indices], X[test_indices]
+            ytrain, ytest = y[train_indices], y[test_indices]
+
+            for depth_idx, depth in enumerate(depths):
+                clf = DecisionTreeClassifier(max_depth=depth)
+                clf.fit(Xtrain, ytrain)
+                y_pred = clf.predict(Xtest)
+                accuracies[i * num_folds + j, depth_idx] = accuracy_score(ytest, y_pred)
+
+    # Calculate mean and standard deviation for each depth
+    mean_accuracies = np.mean(accuracies, axis=0)
+    std_accuracies = np.std(accuracies, axis=0)
+
+    # Calculate mean accuracy and standard deviation for each training subset
+    subset_sizes = np.arange(0.1, 1.1, 0.1)
+    mean_subset_accuracies = np.zeros((len(subset_sizes), len(depths)))
+    std_subset_accuracies = np.zeros((len(subset_sizes), len(depths)))
+
+    for i, subset_size in enumerate(subset_sizes):
+        for depth_idx, depth in enumerate(depths):
+            subset_end = int(subset_size * n)
+            subset_accuracies = accuracies[:, depth_idx][accuracies[:, depth_idx] != 0][:subset_end]
+            mean_subset_accuracies[i, depth_idx] = np.mean(subset_accuracies)
+            std_subset_accuracies[i, depth_idx] = np.std(subset_accuracies)
+
+    # Plotting the learning curve
+    plt.figure(figsize=(10, 6))
+
+    for depth_idx, depth in enumerate(depths):
+        plt.errorbar(subset_sizes * 100, mean_subset_accuracies[:, depth_idx],
+                     yerr=std_subset_accuracies[:, depth_idx], label=f'Depth={depth}')
+
+    plt.xlabel('Percentage of Training Data')
+    plt.ylabel('Accuracy')
+    plt.title('Learning Curve')
+    plt.legend()
+    plt.grid()
+    plt.show()
+
+# Test the function
+evaluatePerformance()
